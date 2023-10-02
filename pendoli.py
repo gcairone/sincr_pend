@@ -37,14 +37,16 @@ class Sistema:
         initial_cond.append(0)
         initial_cond.append(0)
 
-        def dSdt(t, S):
+        initial_cond = np.array(initial_cond)
+
+        def dSdt(S) -> np.array:
             # S   di tipo [ang1, ome1, ..., angk, omek, pos, vel]
             # res di tipo [ome1, acc1, ..., omek, acck, vel, acc]
             res = []
             # calcolo vel e acc
             vel = S[-1]
-            acc = self.m * self.l * sum(
-                S[k + 1] ** 2 * np.sin(S[k]) - 0.5 * g * np.sin(2 * S[k]) for k in range(0, 2 * len(self.pendoli), 2))
+            acc = self.m *  sum(
+                self.l * (S[k + 1] ** 2 * np.sin(S[k])) - g * np.sin(2 * S[k]) for k in range(0, 2 * len(self.pendoli), 2))
             acc /= self.M + self.m * sum(np.sin(S[k]) ** 2 for k in range(0, 2 * len(self.pendoli), 2))
             # calcolo omega e acc ang
             for k in range(0, 2 * len(self.pendoli), 2):
@@ -54,16 +56,39 @@ class Sistema:
                 res.append(acc_ang)
             res.append(vel)
             res.append(acc)
+            return np.array(res)
+        
+        def integrate_t(fun: callable, yn: np.array, h: float) -> np.array:
+            k1 = h*fun(yn)
+            k2 = h*fun(yn + (1/5)*k1)
+            k3 = h*fun(yn + (3/40)*k1 + (9/40)*k2)
+            k4 = h*fun(yn + (44/45)*k1 - (56/15)*k2 + (39/9)*k3)
+            k5 = h*fun(yn + (19372/6561)*k1 - (25360/2187)*k2 + (64448/6561)*k3 - (212/729)*k4)
+            k6 = h*fun(yn + (9017/3168)*k1 - (355/33)*k2 - (46732/5247)*k3 + (49/176)*k4 - (5103/18656)*k5)
+            # k7 = h*fun(yn + (35/384)*k1 + (500/1113)*k3 + (125/192)*k4 - (2187/6784)*k5 + (11/84)*k6)
+
+            return yn + (35/384)*k1 + (500/1113)*k3 + (135/192)*k4 - (2187/6784)*k5 + (11/84)*k6
+
+
+        def integrate_all(fun: callable, t_span: np.array, y0: np.array, h: float) -> np.array:
+            res = np.zeros(shape=(n + 1, 2 * len(self.pendoli) + 2))
+            res[0] = y0
+            t_eval = self.t
+            for t, index in zip(t_eval, range(1, len(t_eval))):
+                res[index] = integrate_t(fun, res[index - 1], h)
+                print(res[index], end="\n")
             return res
 
-        solution = integrate.solve_ivp(dSdt, t_span=[0, self.t[-1]], y0=initial_cond, t_eval=self.t)
+        
+        #solution = integrate.solve_ivp(dSdt, t_span=[0, self.t[-1]], y0=initial_cond, t_eval=self.t)
+        solution = integrate_all(dSdt, [0, self.t[-1]], initial_cond, timestep)
         # metti le soluzioni nei giusti array
-        self.x = solution.y[-2]
-        self.v = solution.y[-1]
+        self.x = solution[:,-2]
+        self.v = solution[:,-1]
         j = 0
         for p in self.pendoli:
-            p.theta = solution.y[j]
-            p.omega = solution.y[j + 1]
+            p.theta = solution[:,j]
+            p.omega = solution[:,j + 1]
             j += 2
 
     def grafici_pend(self):
