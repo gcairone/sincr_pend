@@ -70,7 +70,7 @@ class Sistema:
             res[0] = y0
             t_eval = self.t
             for t, index in zip(t_eval, range(1, len(t_eval))):
-                res[index] = integrate_t(fun, res[index - 1], t)
+                res[index] = integrate_t(fun, res[index - 1], h)
             return res
 
         
